@@ -7,7 +7,7 @@ from django.views.generic import TemplateView
 from django.conf import settings
 from django.conf.urls.static import static
 from . import views
-from .views import login_api
+from .views import login_api, tax_invoice_list_create
 from django.conf.urls.static import static
 from django.contrib import admin
 

@@ -42,8 +42,16 @@ from email.mime.text import MIMEText
 from django.contrib.auth import get_user_model
 from datetime import datetime
 from .serializers import UserLoginInfoSerializer
-
 User = get_user_model()
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from .models import TaxInvoice
+from .serializers import (TaxInvoiceCreateSerializer,TaxInvoiceSerializer)
+from .models import PartyDetail
+from .serializers import PartyDetailSerializer
+
 
 
 
@@ -638,40 +646,6 @@ def profile_api(request):
         }
     })
 
-# =========================================
-# GENERATE UNIQUE CODE API
-# =========================================
-
-"""@csrf_exempt
-def generate_unique_code_api(request):
-    defaults="PJKSS"
-    def create_code():
-        Generates a random 10-character alphanumeric string.
-        return ''.join(
-            random.choices(string.ascii_uppercase + string.digits, k=10)
-        )
-
-    # Get current year as string
-    current_year = datetime.now().year  # e.g., 2026
-
-    # Generate initial code with year included
-    code = defaults+f"{current_year}"+create_code()
-
-    # Ensure code is unique
-    while UniqueCode.objects.filter(code=code).exists():
-        #code = f"PJKSS{current_year}{create_code()}"
-        code = defaults+f"{current_year}"+create_code()
-
-    # Save the unique code
-    UniqueCode.objects.create(code=code)
-
-
-    return JsonResponse({
-        "success": True,
-        "code": code
-    }) """
-
-
 @csrf_exempt
 def generate_unique_code_api(request):
 
@@ -753,14 +727,7 @@ def generate_unique_code_api(request):
 
         return JsonResponse({
             "success": True,
-            "code": record.code,
-            "issuername": record.issuername,
-            "issuedto": record.issuedto,
-            "subject": record.subject,
-            "issuedate": (
-                record.issuedate.isoformat()
-                if record.issuedate else None
-            )
+            "message": "Succesfully serial number Generated"
         })
 
     except json.JSONDecodeError:
@@ -1096,5 +1063,153 @@ class ChangePasswordAPIView(APIView):
 
 
 
+#Vijya///////////////////////////////////////////////////////
+
+# =========================================
+# CREATE AND DISPLAY TAX INVOICES
+# =========================================
+
+@api_view(["GET", "POST"])
+def tax_invoice_list_create(request):
+
+    # GET: Display all invoices
+    if request.method == "GET":
+
+        invoices = TaxInvoice.objects.prefetch_related(
+            "items"
+        ).all()
+
+        serializer = TaxInvoiceSerializer(
+            invoices,
+            many=True
+        )
+
+        return Response(serializer.data)
+
+    # POST: Create new invoice
+    if request.method == "POST":
+
+        serializer = TaxInvoiceCreateSerializer(
+            data=request.data
+        )
+
+        if serializer.is_valid():
+
+            invoice = serializer.save()
+
+            response_serializer = TaxInvoiceSerializer(invoice)
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Invoice created successfully",
+                    "invoice": response_serializer.data
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            {
+                "success": False,
+                "errors": serializer.errors
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
 
 
+# =========================================
+# GET SINGLE INVOICE
+# =========================================
+
+@api_view(["GET"])
+def tax_invoice_detail(request, invoice_id):
+
+    try:
+        invoice = TaxInvoice.objects.prefetch_related(
+            "items"
+        ).get(id=invoice_id)
+
+    except TaxInvoice.DoesNotExist:
+
+        return Response(
+            {"error": "Invoice not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    serializer = TaxInvoiceSerializer(invoice)
+
+    return Response(serializer.data)
+
+
+@api_view(["GET", "POST"])
+def party_list_create(request):
+
+    # सभी पार्टियों की लिस्ट
+    if request.method == "GET":
+        parties = PartyDetail.objects.all().order_by("-id")
+        serializer = PartyDetailSerializer(parties, many=True)
+        return Response(serializer.data)
+
+    # नई पार्टी सेव करना
+    elif request.method == "POST":
+        serializer = PartyDetailSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "message": "Party saved successfully",
+                    "data": serializer.data
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(["GET", "PUT", "PATCH", "DELETE"])
+def party_detail(request, party_id):
+
+    try:
+        party = PartyDetail.objects.get(id=party_id)
+    except PartyDetail.DoesNotExist:
+        return Response(
+            {"message": "Party not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # एक पार्टी की जानकारी
+    if request.method == "GET":
+        serializer = PartyDetailSerializer(party)
+        return Response(serializer.data)
+
+    # पार्टी अपडेट करना
+    elif request.method in ["PUT", "PATCH"]:
+        serializer = PartyDetailSerializer(
+            party,
+            data=request.data,
+            partial=(request.method == "PATCH")
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Party updated successfully",
+                "data": serializer.data
+            })
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # पार्टी डिलीट करना
+    elif request.method == "DELETE":
+        party.delete()
+        return Response(
+            {"message": "Party deleted successfully"},
+            status=status.HTTP_200_OK
+        )

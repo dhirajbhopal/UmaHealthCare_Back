@@ -34,7 +34,7 @@ remove existing repo
 git remote -v
 git remote set-url origin https://github.com/dhirajbhopal/Django_Backend.git
 
-
+git remote set-url origin https://github.com/dhirajbhopal/pjkss.git
 
 
 
@@ -46,7 +46,7 @@ python any wherecommand
 
 to upload data base :- mysql -h pjkss.mysql.pythonanywhere-services.com -u pjkss -p pjkss\$pjkss_db < /home/pjkss/pjkss_backup.sql
 
-
+bash colsoe rename folder (mv Django_Backend PJKSS)
 
 Python Installtio Required Rquired 
 
@@ -103,3 +103,5 @@ host:- db.civhkqvhozkqtuglydsn.supabasepatel@PJKSS#dehri$bihar%2026.co
 port:- 5432
 database :- postgres
 user:- postgres
+
+
