@@ -151,7 +151,7 @@ class TaxInvoiceCreateSerializer(serializers.ModelSerializer):
 
             taxable_amount = max(
                 Decimal("0"),
-                (qty * rate) - discount
+                (qty * rate)
             )
 
             cgst = (
@@ -165,7 +165,7 @@ class TaxInvoiceCreateSerializer(serializers.ModelSerializer):
             )
 
             total = (
-                taxable_amount + cgst + sgst
+                taxable_amount + cgst + sgst-discount
             ).quantize(
                 Decimal("0.01"),
                 rounding=ROUND_HALF_UP
