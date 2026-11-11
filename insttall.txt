@@ -1,0 +1,38 @@
+
+npm install axios react-admin @mui/material @emotion/react @emotion/styled ra-data-json-server ra-data-simple-rest bootstrap @fortawesome/fontawesome-free react react-dom --legacy-peer-deps
+
+npm install axios
+npm install react-admin
+npm install @mui/material @emotion/react @emotion/styled
+npm install --legacy-peer-deps
+npm install ra-data-json-server
+npm install ra-data-simple-rest
+npm install ra-data-simple-rest --legacy-peer-deps
+npm install bootstrap
+npm install @fortawesome/fontawesome-free
+npm install react
+npm install react react-dom
+npm install html2pdf.js
+npm install @craco/craco
+
+
+
+
+
+py -m pip install --upgrade pip setuptools wheel && py -m pip install django djangorestframework django-cors-headers pillow qrcode PyMySQL certifi requests psycopg2-binary dj-database-url python-dotenv
+
+pip install psycopg2-binary
+pip install dj-database-url
+pip install python-dotenv psycopg2
+pip install python-dotenv
+pip install django
+pip install --upgrade pip
+pip install PyMySQL
+pip install certifi
+pip install requests
+pip install djangorestframework
+pip install django-cors-headers
+pip isntall pillow
+pip isntall qrcode
+pip install PyMySQL
+py -m pip install user-agents

@@ -44,6 +44,9 @@ urlpatterns = [
     path("abewinvoiceview/<int:invoice_id>/",views.tax_invoice_detail,name="tax_invoice_detail"),
     path("parties/", views.party_list_create, name="party-list-create"),
     path("parties/<int:party_id>/", views.party_detail, name="party-detail"),
+    path("abewinvoice/",views.tax_invoice_list_create,name="tax_invoice_list_create"),
+    path("abewinvoice/<int:invoice_id>/",views.tax_invoice_update,name="tax_invoice_update"),
+    path( "abewinvoice/<int:invoice_id>/email/",views.send_invoice_email,name="send_invoice_email"),
 ]
  
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

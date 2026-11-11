@@ -1,7 +1,7 @@
 from django.contrib import admin
 #from student.models import student
 #from faculty.models import faculty
-from core.models import User,UniqueCode, donation,UserLoginInfo,updates
+from core.models import User,UniqueCode, donation,UserLoginInfo,updates,PartyDetail,TaxInvoice, TaxInvoiceItem
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin
 from django.utils.html import format_html
 
@@ -80,3 +80,23 @@ class updatesAdmin(admin.ModelAdmin):
     list_display=['topic','date']
 
 
+
+#vijay/////////////
+
+@admin.register(PartyDetail)
+class PartyDetailAdmin(admin.ModelAdmin):
+    list_display=['name','email','mobilno','address','shipping_add','gstin_uin']
+
+
+@admin.register(TaxInvoice )
+class TaxInvoiceAdmin(admin.ModelAdmin):
+    list_display=['serial_no','invoice_date', 'name','email','mobile_no','address','shipping_add','gstin_uin']
+
+
+
+
+@admin.register(TaxInvoiceItem )
+class TaxInvoiceItemAdmin(admin.ModelAdmin):
+    list_display=['invoice_id','item_no', 'item_name','hsn_code','quantity','unit','rate','cgst_rate','sgst_rate',
+    'discount', 'total_amount']
+    

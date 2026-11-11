@@ -1,19 +1,21 @@
-MySQL Setup Instructions
 
-1. Install required packages:
-   pip install -r requirements_mysql.txt
+MyQsl Module Required
 
-2. Create a MySQL database.
+pip install PyMySQL
+pip install mysqlclient
 
-3. Open django_user/settings.py and update:
-   - NAME
-   - USER
-   - PASSWORD
+root pass:- patel@PJKSS#dehri$bihar%2026
+user :-pjkssdhiraj  
+pass:- patel@PJKSS#dehri$bihar%2026
+windows server name:-MySQL80
 
-4. Run migrations:
-   python manage.py migrate
+change command js to sql :- \sql
 
-5. Start server:
-   python manage.py runserver
+run command :-  \connect root@localhost
 
+check version1 :- mysql --version  
+check version1 :- "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" --version
 
+path:- C:\Program Files\MySQL\MySQL Server 8.0\bin  (important)
+
+backup MySQL database :- mysqldump -u pjkssdhiraj -p pjkss_db > "C:\Users\Dhiraj-PC\Desktop\pjkss_backup.sql"

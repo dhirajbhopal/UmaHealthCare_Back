@@ -47,17 +47,18 @@ User = get_user_model()
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .models import TaxInvoice
+from .models import TaxInvoice , TaxInvoiceItem  , PartyDetail
 from .serializers import (TaxInvoiceCreateSerializer,TaxInvoiceSerializer)
-from .models import PartyDetail
 from .serializers import PartyDetailSerializer
 
+from decimal import Decimal, ROUND_HALF_UP
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
+from django.core.mail import EmailMessage
 
-
-
-# =========================================
-# SIGNUP API
-# =========================================
 
 # ==========================================
 # SIGNUP API
@@ -116,7 +117,7 @@ class Signup(View):
 
             Visit :
             <span style='color:red'>
-            https://pjkss.com/pateladminlogin/?next=/pateladminlogin
+            https://pjkss.pythonanywhere.com/admin/login/?next=/admin/login
             </span>
 
             <br><br>
@@ -1065,6 +1066,89 @@ class ChangePasswordAPIView(APIView):
 
 #Vijya///////////////////////////////////////////////////////
 
+
+# =========================================
+# Create New Party Lst
+# =========================================
+
+@api_view(["GET", "POST"])
+def party_list_create(request):
+
+    # सभी पार्टियों की लिस्ट
+    if request.method == "GET":
+        parties = PartyDetail.objects.all().order_by("-id")
+        serializer = PartyDetailSerializer(parties, many=True)
+        return Response(serializer.data)
+
+    # नई पार्टी सेव करना
+    elif request.method == "POST":
+        serializer = PartyDetailSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "message": "Party saved successfully",
+                    "data": serializer.data
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+
+# =========================================
+# Party Deail
+# =========================================
+
+@api_view(["GET", "PUT", "PATCH", "DELETE"])
+def party_detail(request, party_id):
+
+    try:
+        party = PartyDetail.objects.get(id=party_id)
+    except PartyDetail.DoesNotExist:
+        return Response(
+            {"message": "Party not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # एक पार्टी की जानकारी
+    if request.method == "GET":
+        serializer = PartyDetailSerializer(party)
+        return Response(serializer.data)
+
+    # पार्टी अपडेट करना
+    elif request.method in ["PUT", "PATCH"]:
+        serializer = PartyDetailSerializer(
+            party,
+            data=request.data,
+            partial=(request.method == "PATCH")
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Party updated successfully",
+                "data": serializer.data
+            })
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # पार्टी डिलीट करना
+    elif request.method == "DELETE":
+        party.delete()
+        return Response(
+            {"message": "Party deleted successfully"},
+            status=status.HTTP_200_OK
+        )
+
 # =========================================
 # CREATE AND DISPLAY TAX INVOICES
 # =========================================
@@ -1141,75 +1225,344 @@ def tax_invoice_detail(request, invoice_id):
     return Response(serializer.data)
 
 
-@api_view(["GET", "POST"])
-def party_list_create(request):
-
-    # सभी पार्टियों की लिस्ट
-    if request.method == "GET":
-        parties = PartyDetail.objects.all().order_by("-id")
-        serializer = PartyDetailSerializer(parties, many=True)
-        return Response(serializer.data)
-
-    # नई पार्टी सेव करना
-    elif request.method == "POST":
-        serializer = PartyDetailSerializer(data=request.data)
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response(
-                {
-                    "message": "Party saved successfully",
-                    "data": serializer.data
-                },
-                status=status.HTTP_201_CREATED
-            )
-
-        return Response(
-            serializer.errors,
-            status=status.HTTP_400_BAD_REQUEST
-        )
 
 
-@api_view(["GET", "PUT", "PATCH", "DELETE"])
-def party_detail(request, party_id):
+
+from decimal import Decimal, ROUND_HALF_UP
+
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.exceptions import ValidationError
+
+from .models import TaxInvoice, TaxInvoiceItem
+
+
+# =========================================
+# UPDATE INVOICE ITEMS ONLY
+# CUSTOMER DETAILS WILL NOT BE MODIFIED
+# DISCOUNT AFTER GST
+# =========================================
+
+@api_view(["PUT", "PATCH"])
+def tax_invoice_update(request, invoice_id):
 
     try:
-        party = PartyDetail.objects.get(id=party_id)
-    except PartyDetail.DoesNotExist:
+
+        with transaction.atomic():
+
+            # =================================
+            # GET EXISTING INVOICE
+            # =================================
+
+            invoice = get_object_or_404(
+                TaxInvoice.objects.select_for_update(),
+                id=invoice_id
+            )
+
+            # =================================
+            # GET ITEMS FROM REACT
+            # =================================
+
+            items_data = request.data.get("items")
+
+            if not isinstance(items_data, list) or not items_data:
+
+                raise ValidationError(
+                    "At least one invoice item is required."
+                )
+
+            retained_item_numbers = []
+
+            # =================================
+            # PROCESS EACH ITEM
+            # =================================
+
+            for index, item in enumerate(items_data):
+
+                item_no = index + 1
+
+                item_name = str(
+                    item.get("item_name") or ""
+                ).strip()
+
+                if not item_name:
+
+                    raise ValidationError(
+                        f"Item name required in row {item_no}."
+                    )
+
+                try:
+
+                    quantity = Decimal(
+                        str(item.get("quantity", 0))
+                    )
+
+                    rate = Decimal(
+                        str(item.get("rate", 0))
+                    )
+
+                    discount = Decimal(
+                        str(item.get("discount", 0))
+                    )
+
+                    cgst_rate = Decimal(
+                        str(item.get("cgst_rate", 0))
+                    )
+
+                    sgst_rate = Decimal(
+                        str(item.get("sgst_rate", 0))
+                    )
+
+                except Exception:
+
+                    raise ValidationError(
+                        f"Invalid numeric value in row {item_no}."
+                    )
+
+                # =================================
+                # VALIDATION
+                # =================================
+
+                if quantity <= 0:
+
+                    raise ValidationError(
+                        f"Invalid quantity in row {item_no}."
+                    )
+
+                if rate < 0 or discount < 0:
+
+                    raise ValidationError(
+                        f"Invalid rate or discount in row {item_no}."
+                    )
+
+                if cgst_rate < 0 or sgst_rate < 0:
+
+                    raise ValidationError(
+                        f"Invalid GST rate in row {item_no}."
+                    )
+
+                # =================================
+                # SUBTOTAL
+                # =================================
+
+                subtotal = quantity * rate
+
+                # =================================
+                # GST ON FULL SUBTOTAL
+                # =================================
+
+                cgst = (
+                    subtotal * cgst_rate / Decimal("100")
+                )
+
+                sgst = (
+                    subtotal * sgst_rate / Decimal("100")
+                )
+
+                total_before_discount = (
+                    subtotal + cgst + sgst
+                )
+
+                # =================================
+                # DISCOUNT AFTER GST
+                # =================================
+
+                if discount > total_before_discount:
+
+                    raise ValidationError(
+                        f"Discount exceeds total amount in row {item_no}."
+                    )
+
+                total_amount = (
+                    total_before_discount - discount
+                ).quantize(
+                    Decimal("0.01"),
+                    rounding=ROUND_HALF_UP
+                )
+
+                # =================================
+                # CREATE OR UPDATE ITEM
+                # =================================
+
+                TaxInvoiceItem.objects.update_or_create(
+
+                    invoice=invoice,
+
+                    item_no=item_no,
+
+                    defaults={
+
+                        "item_name": item_name,
+
+                        "hsn_code": item.get("hsn_code") or None,
+
+                        "quantity": quantity,
+
+                        "unit": item.get("unit") or "PCS",
+
+                        "rate": rate,
+
+                        "cgst_rate": cgst_rate,
+
+                        "sgst_rate": sgst_rate,
+
+                        "discount": discount,
+
+                        # FINAL AMOUNT AFTER GST AND DISCOUNT
+                        "total_amount": total_amount,
+                    }
+                )
+
+                retained_item_numbers.append(item_no)
+
+            # =================================
+            # DELETE REMOVED ITEMS
+            # =================================
+
+            TaxInvoiceItem.objects.filter(
+                invoice=invoice
+            ).exclude(
+                item_no__in=retained_item_numbers
+            ).delete()
+
+            # =================================
+            # RETURN UPDATED INVOICE ITEMS
+            # =================================
+
+            updated_items = TaxInvoiceItem.objects.filter(
+                invoice=invoice
+            ).order_by("item_no")
+
+            return Response(
+                {
+                    "message": "Invoice items updated successfully",
+
+                    "invoice_id": invoice.id,
+
+                    "serial_no": invoice.serial_no,
+
+                    "items": list(
+                        updated_items.values()
+                    )
+                },
+                status=status.HTTP_200_OK
+            )
+
+    except ValidationError as e:
+
         return Response(
-            {"message": "Party not found"},
-            status=status.HTTP_404_NOT_FOUND
-        )
-
-    # एक पार्टी की जानकारी
-    if request.method == "GET":
-        serializer = PartyDetailSerializer(party)
-        return Response(serializer.data)
-
-    # पार्टी अपडेट करना
-    elif request.method in ["PUT", "PATCH"]:
-        serializer = PartyDetailSerializer(
-            party,
-            data=request.data,
-            partial=(request.method == "PATCH")
-        )
-
-        if serializer.is_valid():
-            serializer.save()
-            return Response({
-                "message": "Party updated successfully",
-                "data": serializer.data
-            })
-
-        return Response(
-            serializer.errors,
+            {"error": e.detail},
             status=status.HTTP_400_BAD_REQUEST
         )
 
-    # पार्टी डिलीट करना
-    elif request.method == "DELETE":
-        party.delete()
+    except Exception as e:
+
         return Response(
-            {"message": "Party deleted successfully"},
+            {
+                "error": "Invoice item update failed",
+                "details": str(e)
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+
+#///////////////Tax invoice EMail Sending/////////////////////
+
+@api_view(["POST"])
+def send_invoice_email(request, invoice_id):
+
+    try:
+
+        invoice = get_object_or_404(
+            TaxInvoice,
+            id=invoice_id
+        )
+
+        # Get customer email from database
+        customer_email = invoice.email
+
+        if not customer_email:
+            return Response(
+                {"error": "Customer email address not found."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get generated PDF
+        pdf_file = request.FILES.get("pdf_file")
+
+        if not pdf_file:
+            return Response(
+                {"error": "Invoice PDF is missing."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if pdf_file.size > 10 * 1024 * 1024:
+            return Response(
+                {"error": "PDF file must be smaller than 10 MB."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if pdf_file.content_type != "application/pdf":
+            return Response(
+                {"error": "Only PDF files are allowed."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create email
+        email = EmailMessage(
+            subject=f"Tax Invoice - {invoice.serial_no}",
+
+            body=f"""
+Dear {invoice.name or invoice.customer_name},
+
+Please find attached your tax invoice.
+
+Invoice Number: {invoice.serial_no}
+
+Thank you for choosing AB Electrical Works.
+
+Regards,
+AB ELECTRICAL WORKS
+Plot No 7 Narkra Bokaro Steel City
+Bokaro Steel City 827014
+Mob No : 9431378910. 7870865028. 6200919537
+GSTIN NO : 201PEPS5760GIZR
+""",
+
+            from_email=settings.DEFAULT_FROM_EMAIL,
+
+            to=[customer_email]
+        )
+
+        # Attach PDF
+        email.attach(
+            f"{invoice.serial_no}.pdf",
+            pdf_file.read(),
+            "application/pdf"
+        )
+
+        # Send email
+        email.send(fail_silently=False)
+
+        return Response(
+            {
+                "success": True,
+                "message": "Invoice email sent successfully.",
+                "email": customer_email
+            },
             status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+
+        return Response(
+            {
+                "error": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )

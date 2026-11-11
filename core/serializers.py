@@ -7,6 +7,7 @@ from django.db import transaction
 from .models import TaxInvoice, TaxInvoiceItem, PartyDetail
 from rest_framework import serializers
 
+
 # Automatically fetches your project's active User model (Custom or Default)
 User = get_user_model()
 
@@ -17,15 +18,15 @@ class UserLoginInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = UserLoginInfo
         fields = [
-            'id', 
-            'user', 
-            'ip_address', 
-            'city', 
-            'region', 
-            'country', 
-            'browser', 
-            'os', 
-            'device', 
+            'id',
+            'user',
+            'ip_address',
+            'city',
+            'region',
+            'country',
+            'browser',
+            'os',
+            'device',
             'created_at'  # Included assuming you have a timestamp field
         ]
         # 'id' and 'created_at' should be read-only so React doesn't have to provide them
@@ -33,7 +34,7 @@ class UserLoginInfoSerializer(serializers.ModelSerializer):
 
     def validate_ip_address(self, value):
         """
-        Optional: Basic sanitation field validation. 
+        Optional: Basic sanitation field validation.
         Ensures that if React sends an empty IP string, it defaults nicely.
         """
         if not value or value.strip() == "":
@@ -48,154 +49,148 @@ class PasswordResetSerializer(serializers.Serializer):
     #Vijay Detail////////////////////////////////////////////////////
 
 
+from rest_framework import serializers
+from django.db import transaction
+
+from .models import PartyDetail, TaxInvoice, TaxInvoiceItem
+
+
+# =========================================
+# PARTY DETAIL SERIALIZER
+# =========================================
+
 class PartyDetailSerializer(serializers.ModelSerializer):
+
     class Meta:
         model = PartyDetail
+        fields = "__all__"
+
+
+# =========================================
+# INVOICE ITEM SERIALIZER
+# =========================================
+
+class InvoiceItemSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = TaxInvoiceItem
         fields = [
             "id",
-            "name",
-            "email",
-            "mobilno",
-            "address",
-            "shipping_add",
-            "gstin_uin",
-            "created_at",
+            "item_no",
+            "item_name",
+            "hsn_code",
+            "quantity",
+            "unit",
+            "rate",
+            "cgst_rate",
+            "sgst_rate",
+            "discount",
+            "total_amount",
         ]
-        read_only_fields = ["id", "created_at"]
 
-    def validate_name(self, value):
-        value = value.strip()
-        if not value:
-            raise serializers.ValidationError("Party name is required.")
-        return value
+        read_only_fields = ["id", "item_no", "total_amount"]
 
 
 # =========================================
-# INPUT SERIALIZER FOR EACH ITEM
+# TAX INVOICE DISPLAY SERIALIZER
 # =========================================
 
-class TaxInvoiceItemInputSerializer(serializers.Serializer):
+class TaxInvoiceSerializer(serializers.ModelSerializer):
 
-    item_name = serializers.CharField(max_length=200)
-    hsn_code = serializers.CharField(
-        max_length=20, required=False, allow_blank=True
-    )
+    items = InvoiceItemSerializer(many=True, read_only=True)
 
-    quantity = serializers.DecimalField(
-        max_digits=10, decimal_places=2
-    )
+    class Meta:
+        model = TaxInvoice
+        fields = "__all__"
 
-    unit = serializers.CharField(
-        max_length=20, required=False, allow_blank=True
-    )
 
-    rate = serializers.DecimalField(
-        max_digits=12, decimal_places=2
-    )
+from decimal import Decimal, ROUND_HALF_UP
+from django.db import transaction
+from rest_framework import serializers
 
-    cgst_rate = serializers.DecimalField(
-        max_digits=5, decimal_places=2, default=Decimal("0")
-    )
-
-    sgst_rate = serializers.DecimalField(
-        max_digits=5, decimal_places=2, default=Decimal("0")
-    )
-
-    discount = serializers.DecimalField(
-        max_digits=10, decimal_places=2, default=Decimal("0")
-    )
+from .models import TaxInvoice, TaxInvoiceItem
 
 
 # =========================================
-# INVOICE CREATE SERIALIZER
+# TAX INVOICE CREATE SERIALIZER
+# DISCOUNT AFTER GST
 # =========================================
 
 class TaxInvoiceCreateSerializer(serializers.ModelSerializer):
 
-    items = TaxInvoiceItemInputSerializer(many=True)
+    items = InvoiceItemSerializer(many=True)
 
     class Meta:
         model = TaxInvoice
         fields = [
-            "invoice_date",
-            "customer_name",
+            "name",
             "email",
             "mobile_no",
             "address",
             "shipping_add",
             "gstin_uin",
-            "items"
+            "invoice_date",
+            "items",
         ]
-
-    def validate_items(self, value):
-        if not value:
-            raise serializers.ValidationError(
-                "At least one invoice item is required."
-            )
-        return value
 
     @transaction.atomic
     def create(self, validated_data):
 
         items_data = validated_data.pop("items")
 
-        # Create invoice master
+        # CREATE INVOICE MASTER
         invoice = TaxInvoice.objects.create(**validated_data)
 
-        # Create all line items
-        for item_no, item in enumerate(items_data, start=1):
+        # CREATE INVOICE ITEMS
+        for index, item_data in enumerate(items_data, start=1):
 
-            qty = item["quantity"]
-            rate = item["rate"]
-            discount = item["discount"]
+            quantity = Decimal(str(item_data.get("quantity") or 0))
+            rate = Decimal(str(item_data.get("rate") or 0))
+            discount = Decimal(str(item_data.get("discount") or 0))
 
-            taxable_amount = max(
-                Decimal("0"),
-                (qty * rate) - discount
-            )
+            cgst_rate = Decimal(str(item_data.get("cgst_rate") or 0))
+            sgst_rate = Decimal(str(item_data.get("sgst_rate") or 0))
 
-            cgst = (
-                taxable_amount * item["cgst_rate"]
-                / Decimal("100")
-            )
+            # =================================
+            # SUBTOTAL
+            # =================================
 
-            sgst = (
-                taxable_amount * item["sgst_rate"]
-                / Decimal("100")
-            )
+            subtotal = quantity * rate
 
-            total = (
-                taxable_amount + cgst + sgst
+            # =================================
+            # GST ON FULL SUBTOTAL
+            # =================================
+
+            cgst = subtotal * cgst_rate / Decimal("100")
+            sgst = subtotal * sgst_rate / Decimal("100")
+
+            # =================================
+            # DISCOUNT AFTER GST
+            # =================================
+
+            total_before_discount = subtotal + cgst + sgst
+
+            if discount < 0 or discount > total_before_discount:
+                raise serializers.ValidationError(
+                    f"Invalid discount in item row {index}."
+                )
+
+            total_amount = (
+                total_before_discount - discount
             ).quantize(
                 Decimal("0.01"),
                 rounding=ROUND_HALF_UP
             )
 
+            # REMOVE CLIENT-SENT TOTAL
+            item_data.pop("total_amount", None)
+
+            # SAVE ITEM
             TaxInvoiceItem.objects.create(
                 invoice=invoice,
-                item_no=item_no,
-                total_amount=total,
-                **item
+                item_no=index,
+                total_amount=total_amount,
+                **item_data
             )
 
         return invoice
-
-
-# =========================================
-# INVOICE OUTPUT SERIALIZERS
-# =========================================
-
-class TaxInvoiceItemSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = TaxInvoiceItem
-        fields = "__all__"
-
-
-class TaxInvoiceSerializer(serializers.ModelSerializer):
-
-    items = TaxInvoiceItemSerializer(many=True, read_only=True)
-
-    class Meta:
-        model = TaxInvoice
-        fields = "__all__"
