@@ -25,6 +25,7 @@ from django.contrib.auth import authenticate, login, logout
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from django.views.decorators.http import require_GET
 import qrcode
 from io import BytesIO
 from rest_framework.views import APIView
@@ -459,40 +460,55 @@ def logout_api(request):
     })
 
 
+
 # =========================================
 # PROFILE API
 # =========================================
 
+@require_GET
 def profile_api(request):
-    # 1. CHECK AUTHENTICATION
+
+    # 1. AUTHENTICATION CHECK
     if not request.user.is_authenticated:
         return JsonResponse({
             "success": False,
             "message": "User Not Logged In"
-        }, status=401) # Explicit unauthorized status
+        }, status=401)
 
     try:
+
         user = request.user
 
-        # Safe image handling
-        image_url = user.image.url if user.image else None
-        # Note: If these fields are on a Profile model, use user.profile.mobileno, etc.
+        # 2. SAFE IMAGE URL HANDLING
+        image_url = None
 
+        if getattr(user, "image", None):
+
+            try:
+                image_url = request.build_absolute_uri(
+                    user.image.url
+                )
+            except (ValueError, OSError):
+                image_url = None
+
+        # 3. PROFILE RESPONSE
         return JsonResponse({
             "success": True,
             "user": {
                 "id": user.id,
                 "username": user.username,
                 "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "mobileno": getattr(user, 'mobileno', ''),
-                "gender": getattr(user, 'gender', ''),
-                "address": getattr(user, 'address', ''),
-                "image": str(user.image)
+                "first_name": user.first_name or "",
+                "last_name": user.last_name or "",
+                "mobileno": getattr(user, "mobileno", "") or "",
+                "gender": getattr(user, "gender", "") or "",
+                "address": getattr(user, "address", "") or "",
+                "image": image_url
             }
-        })
+        }, status=200)
+
     except Exception as e:
+
         return JsonResponse({
             "success": False,
             "message": f"Server Error: {str(e)}"
@@ -502,16 +518,18 @@ def profile_api(request):
 # =========================================
 # UPDATE PROFILE API
 # =========================================
+
 @csrf_exempt
 def update_profile_api(request):
-    # 1. Ensure the user is actually logged in
+
+    # 1. AUTHENTICATION CHECK
     if not request.user.is_authenticated:
         return JsonResponse({
             "success": False,
-            "message": "Authentication Required. Please log in."
+            "message": "Authentication Required. Please Login."
         }, status=401)
 
-    # 2. Only allow PUT requests
+    # 2. REQUEST METHOD CHECK
     if request.method != "PUT":
         return JsonResponse({
             "success": False,
@@ -519,33 +537,98 @@ def update_profile_api(request):
         }, status=405)
 
     try:
-        # Load the incoming React JSON data
-        data = json.loads(request.body)
 
-        # DYNAMIC USER: Get the user directly from the request session
+        # 3. READ JSON DATA
+        try:
+            data = json.loads(request.body or "{}")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return JsonResponse({
+                "success": False,
+                "message": "Invalid JSON Data"
+            }, status=400)
+
+        if not isinstance(data, dict):
+            return JsonResponse({
+                "success": False,
+                "message": "Invalid Request Data"
+            }, status=400)
+
+        # 4. GET LOGGED-IN USER
         user = request.user
 
-        # Update core user fields safely
-        user.first_name = data.get("first_name", user.first_name)
-        user.last_name = data.get("last_name", user.last_name)
-        user.mobileno = data.get("mobileno", user.mobileno)
-        user.gender = data.get("gender", user.gender)
-        user.address = data.get("address", user.address)
+        # 5. VALIDATE INPUT
+        first_name = str(
+            data.get("first_name", user.first_name) or ""
+        ).strip()
 
-        # Save changes to the database
+        last_name = str(
+            data.get("last_name", user.last_name) or ""
+        ).strip()
+
+        mobileno = str(
+            data.get("mobileno", getattr(user, "mobileno", "")) or ""
+        ).strip()
+
+        gender = str(
+            data.get("gender", getattr(user, "gender", "")) or ""
+        ).strip()
+
+        address = str(
+            data.get("address", getattr(user, "address", "")) or ""
+        ).strip()
+
+        if not first_name:
+            return JsonResponse({
+                "success": False,
+                "message": "First Name Is Required"
+            }, status=400)
+
+        if not last_name:
+            return JsonResponse({
+                "success": False,
+                "message": "Last Name Is Required"
+            }, status=400)
+
+        if not mobileno.isdigit() or len(mobileno) != 10:
+            return JsonResponse({
+                "success": False,
+                "message": "Mobile Number Must Be 10 Digits"
+            }, status=400)
+
+        if gender not in ["Male", "Female"]:
+            return JsonResponse({
+                "success": False,
+                "message": "Invalid Gender"
+            }, status=400)
+
+        if not address:
+            return JsonResponse({
+                "success": False,
+                "message": "Address Is Required"
+            }, status=400)
+
+        # 6. UPDATE USER FIELDS
+        user.first_name = first_name
+        user.last_name = last_name
+        user.mobileno = mobileno
+        user.gender = gender
+        user.address = address
+
+        # 7. SAVE DATABASE
         user.save()
 
+        # 8. SUCCESS RESPONSE
         return JsonResponse({
             "success": True,
             "message": "Profile Updated Successfully"
-        })
+        }, status=200)
 
     except Exception as e:
+
         return JsonResponse({
             "success": False,
             "message": f"Server Error: {str(e)}"
         }, status=500)
-
 
 
 # =========================================

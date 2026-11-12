@@ -14,10 +14,6 @@ from django.urls import path, include, re_path #new
 from core.views import Signup, PasswordResetAPIView, PasswordResetConfirmAPIView, ChangePasswordAPIView, HomeApi
 from core import views
 
-
-
-
-
 urlpatterns = [
     #path('__debug__/', include('debug_toolbar.urls')),
     path('', include('django.contrib.auth.urls')),
@@ -31,8 +27,8 @@ urlpatterns = [
     path('api/change-password/',views.ChangePasswordAPIView.as_view(),),
     path('signup/',Signup.as_view(),name='Signup'),
     path("sendotp_api/",views.sendotp_api,name="sendotp_api"),
-    path("update_profile_api/",views.update_profile_api),
-    path("profile_api/", views.profile_api),
+    path("profile_api/", views.profile_api, name="profile_api"),
+    path("update_profile_api/", views.update_profile_api, name="update_profile_api"),
     path("donation_list_api/", views.donation_list_api),
     path("generate_unique_code_api/", views.generate_unique_code_api),
     path("search_serial_api/", views.search_serial_api),

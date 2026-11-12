@@ -26,11 +26,8 @@ ALLOWED_HOSTS = ['pjkss.pythonanywhere.com']
 # CSRF and session cookies
 SESSION_COOKIE_SAMESITE = 'None'
 SESSION_COOKIE_SECURE = True
-
 CSRF_COOKIE_SAMESITE = 'None'
 CSRF_COOKIE_SECURE = True
-
-
 CORS_ALLOW_CREDENTIALS = True
 
 # Allow your React origin (including www variant for production)
@@ -53,7 +50,7 @@ CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000"
 ]
 
-SESSION_COOKIE_SAMESITE = "Lax"
+
 
 
 # Application definition

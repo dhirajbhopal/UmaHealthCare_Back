@@ -148,15 +148,8 @@ class TaxInvoiceCreateSerializer(serializers.ModelSerializer):
             rate = Decimal(str(item_data.get("rate") or 0))
             discount = Decimal(str(item_data.get("discount") or 0))
 
-<<<<<<< HEAD
             cgst_rate = Decimal(str(item_data.get("cgst_rate") or 0))
             sgst_rate = Decimal(str(item_data.get("sgst_rate") or 0))
-=======
-            taxable_amount = max(
-                Decimal("0"),
-                (qty * rate)
-            )
->>>>>>> 8eeab4dc806c990afe5f4ce9d3c86eadc722b7e7
 
             # =================================
             # SUBTOTAL
@@ -164,7 +157,6 @@ class TaxInvoiceCreateSerializer(serializers.ModelSerializer):
 
             subtotal = quantity * rate
 
-<<<<<<< HEAD
             # =================================
             # GST ON FULL SUBTOTAL
             # =================================
@@ -185,10 +177,6 @@ class TaxInvoiceCreateSerializer(serializers.ModelSerializer):
 
             total_amount = (
                 total_before_discount - discount
-=======
-            total = (
-                taxable_amount + cgst + sgst-discount
->>>>>>> 8eeab4dc806c990afe5f4ce9d3c86eadc722b7e7
             ).quantize(
                 Decimal("0.01"),
                 rounding=ROUND_HALF_UP
