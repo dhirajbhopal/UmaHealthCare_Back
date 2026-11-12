@@ -77,7 +77,7 @@ REST_FRAMEWORK = {
 
 # MIDDLEWARE
 MIDDLEWARE = [
-    'corsheaders.middleware.CorsMiddleware',  # Must remain at the top
+    'corsheaders.middleware.CorsMiddleware', 
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -171,6 +171,8 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / "media"
 #new----------------------
+
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 
 # Page to go after successfull login
 LOGIN_REDIRECT_URL = 'admin'

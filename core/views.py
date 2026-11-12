@@ -59,6 +59,9 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from django.core.mail import EmailMessage
+from django.views.decorators.csrf import ensure_csrf_cookie
+from PIL import Image, UnidentifiedImageError
+from django.views.decorators.http import require_GET, require_POST
 
 
 # ==========================================
@@ -383,68 +386,138 @@ def sendotp_api(request):
             "success": False,
             "message": str(e)
         })
+
+
+
+import json
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+from django.contrib.auth import login
+from django.contrib.auth.models import User
+from django.contrib.auth import get_user_model
+from django.contrib.auth import BACKEND_SESSION_KEY
+from django.db import DatabaseError
+
+
 # =========================================
 # LOGIN API
 # =========================================
+
 @csrf_exempt
 def login_api(request):
 
-    if request.method == "POST":
+    if request.method != "POST":
+        return JsonResponse({
+            "success": False,
+            "message": "Only POST method allowed"
+        }, status=405)
 
+    try:
+
+        # GET JSON DATA
         data = json.loads(request.body)
 
-        email = data.get("email")
-        password = data.get("password")
+        email = data.get("email", "").strip()
+        password = data.get("password", "")
 
+        # VALIDATION
+        if not email or not password:
+            return JsonResponse({
+                "success": False,
+                "message": "Email and Password are required"
+            }, status=400)
+
+        # GET USER MODEL
+        UserModel = get_user_model()
+
+        # FIND USER
         try:
+            user = UserModel.objects.get(email__iexact=email)
 
-            user = User.objects.get(email=email)
-
-            # CHECK PASSWORD
-            if user.check_password(password):
-
-                # VERY IMPORTANT
-                user.backend = (
-                    "django.contrib.auth.backends.ModelBackend"
-                )
-
-                # LOGIN SESSION
-                login(request, user)
-
-                return JsonResponse({
-                    "success": True,
-                    "message": "Login Successful",
-                    "user": {
-                        "id": user.id,
-                        "role": user.role,
-                        "username": user.username,
-                        "email": user.email,
-                        "first_name": user.first_name,
-                        "last_name": user.last_name,
-                        "mobileno": user.mobileno,
-                        "gender": user.gender,
-                        "address": user.address,
-                        "image": str(user.image)
-                                }
-                })
-
-            else:
-
-                return JsonResponse({
-                    "success": False,
-                    "message": "Invalid Password"
-                })
-
-        except User.DoesNotExist:
-
+        except UserModel.DoesNotExist:
             return JsonResponse({
                 "success": False,
                 "message": "Email Not Found"
-            })
+            }, status=401)
 
-    return JsonResponse({
-        "success": False
-    })
+        # CHECK PASSWORD
+        if not user.check_password(password):
+            return JsonResponse({
+                "success": False,
+                "message": "Invalid Password"
+            }, status=401)
+
+        # CHECK ACTIVE USER
+        if not user.is_active:
+            return JsonResponse({
+                "success": False,
+                "message": "Your account is inactive"
+            }, status=403)
+
+        # SET AUTHENTICATION BACKEND
+        user.backend = (
+            "django.contrib.auth.backends.ModelBackend"
+        )
+
+        # CREATE DJANGO LOGIN SESSION
+        login(request, user)
+
+        # SAVE SESSION
+        request.session.save()
+
+        # VERIFY SESSION
+        if not request.session.session_key:
+            return JsonResponse({
+                "success": False,
+                "message": "Session could not be created"
+            }, status=500)
+
+        return JsonResponse({
+            "success": True,
+            "message": "Login Successful",
+
+            "user": {
+                "id": user.id,
+                "role": user.role,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name,
+                "last_name": user.last_name,
+                "mobileno": user.mobileno,
+                "gender": user.gender,
+                "address": user.address,
+                "image": (
+                    user.image.url if user.image else None
+                )
+            }
+        })
+
+    except json.JSONDecodeError:
+
+        return JsonResponse({
+            "success": False,
+            "message": "Invalid JSON data"
+        }, status=400)
+
+    except DatabaseError as e:
+
+        print("LOGIN DATABASE ERROR:", str(e))
+
+        return JsonResponse({
+            "success": False,
+            "message": "Database error during login"
+        }, status=500)
+
+    except Exception as e:
+
+        print("LOGIN ERROR:", str(e))
+
+        return JsonResponse({
+            "success": False,
+            "message": "Something went wrong during login"
+        }, status=500)
+
 
 # =========================================
 # LOGOUT API
@@ -462,28 +535,49 @@ def logout_api(request):
 
 
 # =========================================
+# CSRF TOKEN API
+# =========================================
+
+@ensure_csrf_cookie
+@require_GET
+def csrf_token_api(request):
+
+    return JsonResponse({
+        "success": True,
+        "message": "CSRF Cookie Set"
+    })
+
+
+# =========================================
+# PROFILE API
+# =========================================
+
+from django.http import JsonResponse
+from django.views.decorators.http import require_GET, require_POST
+from django.contrib.auth import get_user_model
+from PIL import Image, UnidentifiedImageError
+
+
+# =========================================
 # PROFILE API
 # =========================================
 
 @require_GET
 def profile_api(request):
 
-    # 1. AUTHENTICATION CHECK
     if not request.user.is_authenticated:
         return JsonResponse({
             "success": False,
-            "message": "User Not Logged In"
+            "message": "Please Login To View Your Profile"
         }, status=401)
 
     try:
 
         user = request.user
 
-        # 2. SAFE IMAGE URL HANDLING
         image_url = None
 
-        if getattr(user, "image", None):
-
+        if user.image:
             try:
                 image_url = request.build_absolute_uri(
                     user.image.url
@@ -491,92 +585,76 @@ def profile_api(request):
             except (ValueError, OSError):
                 image_url = None
 
-        # 3. PROFILE RESPONSE
         return JsonResponse({
             "success": True,
+            "message": "Profile Loaded Successfully",
+
             "user": {
                 "id": user.id,
                 "username": user.username,
                 "email": user.email,
                 "first_name": user.first_name or "",
                 "last_name": user.last_name or "",
-                "mobileno": getattr(user, "mobileno", "") or "",
-                "gender": getattr(user, "gender", "") or "",
-                "address": getattr(user, "address", "") or "",
+                "mobileno": user.mobileno or "",
+                "gender": user.gender or "",
+                "address": user.address or "",
+                "role": user.role or "",
                 "image": image_url
             }
+
         }, status=200)
 
     except Exception as e:
 
+        print("PROFILE API ERROR:", str(e))
+
         return JsonResponse({
             "success": False,
-            "message": f"Server Error: {str(e)}"
+            "message": "Unable To Load Profile"
         }, status=500)
+
+
 
 
 # =========================================
 # UPDATE PROFILE API
 # =========================================
 
-@csrf_exempt
+@require_POST
 def update_profile_api(request):
 
-    # 1. AUTHENTICATION CHECK
     if not request.user.is_authenticated:
         return JsonResponse({
             "success": False,
-            "message": "Authentication Required. Please Login."
+            "message": "Authentication Required"
         }, status=401)
-
-    # 2. REQUEST METHOD CHECK
-    if request.method != "PUT":
-        return JsonResponse({
-            "success": False,
-            "message": "PUT Method Required"
-        }, status=405)
 
     try:
 
-        # 3. READ JSON DATA
-        try:
-            data = json.loads(request.body or "{}")
-        except (json.JSONDecodeError, UnicodeDecodeError):
-            return JsonResponse({
-                "success": False,
-                "message": "Invalid JSON Data"
-            }, status=400)
-
-        if not isinstance(data, dict):
-            return JsonResponse({
-                "success": False,
-                "message": "Invalid Request Data"
-            }, status=400)
-
-        # 4. GET LOGGED-IN USER
         user = request.user
 
-        # 5. VALIDATE INPUT
-        first_name = str(
-            data.get("first_name", user.first_name) or ""
+        # GET FORM DATA
+        first_name = request.POST.get(
+            "first_name", user.first_name or ""
         ).strip()
 
-        last_name = str(
-            data.get("last_name", user.last_name) or ""
+        last_name = request.POST.get(
+            "last_name", user.last_name or ""
         ).strip()
 
-        mobileno = str(
-            data.get("mobileno", getattr(user, "mobileno", "")) or ""
+        mobileno = request.POST.get(
+            "mobileno", user.mobileno or ""
         ).strip()
 
-        gender = str(
-            data.get("gender", getattr(user, "gender", "")) or ""
+        gender = request.POST.get(
+            "gender", user.gender or ""
         ).strip()
 
-        address = str(
-            data.get("address", getattr(user, "address", "")) or ""
+        address = request.POST.get(
+            "address", user.address or ""
         ).strip()
 
+        # VALIDATION
         if not first_name:
             return JsonResponse({
                 "success": False,
@@ -607,27 +685,77 @@ def update_profile_api(request):
                 "message": "Address Is Required"
             }, status=400)
 
-        # 6. UPDATE USER FIELDS
+        # IMAGE VALIDATION
+        uploaded_image = request.FILES.get("image")
+
+        if uploaded_image:
+
+            if uploaded_image.size > 5 * 1024 * 1024:
+                return JsonResponse({
+                    "success": False,
+                    "message": "Image Size Must Be Below 5 MB"
+                }, status=400)
+
+            try:
+                image = Image.open(uploaded_image)
+                image.verify()
+                uploaded_image.seek(0)
+
+            except (UnidentifiedImageError, OSError, ValueError):
+                return JsonResponse({
+                    "success": False,
+                    "message": "Please Upload A Valid Image"
+                }, status=400)
+
+            # SAVE IMAGE
+            user.image = uploaded_image
+
+        # UPDATE USER DATA
         user.first_name = first_name
         user.last_name = last_name
         user.mobileno = mobileno
         user.gender = gender
         user.address = address
 
-        # 7. SAVE DATABASE
         user.save()
 
-        # 8. SUCCESS RESPONSE
+        # GET UPDATED IMAGE URL
+        image_url = None
+
+        if user.image:
+            try:
+                image_url = request.build_absolute_uri(
+                    user.image.url
+                )
+            except (ValueError, OSError):
+                image_url = None
+
         return JsonResponse({
             "success": True,
-            "message": "Profile Updated Successfully"
+            "message": "Profile Updated Successfully",
+
+            "user": {
+                "id": user.id,
+                "username": user.username,
+                "email": user.email,
+                "first_name": user.first_name or "",
+                "last_name": user.last_name or "",
+                "mobileno": user.mobileno or "",
+                "gender": user.gender or "",
+                "address": user.address or "",
+                "role": user.role or "",
+                "image": image_url
+            }
+
         }, status=200)
 
     except Exception as e:
 
+        print("UPDATE PROFILE ERROR:", str(e))
+
         return JsonResponse({
             "success": False,
-            "message": f"Server Error: {str(e)}"
+            "message": "Unable To Update Profile"
         }, status=500)
 
 
