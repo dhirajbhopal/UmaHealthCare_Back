@@ -27,8 +27,6 @@ urlpatterns = [
     path('api/change-password/',views.ChangePasswordAPIView.as_view(),),
     path('signup/',Signup.as_view(),name='Signup'),
     path("sendotp_api/",views.sendotp_api,name="sendotp_api"),
-    path("profile_api/", views.profile_api, name="profile_api"),
-    path("update_profile_api/", views.update_profile_api, name="update_profile_api"),
     path("donation_list_api/", views.donation_list_api),
     path("generate_unique_code_api/", views.generate_unique_code_api),
     path("search_serial_api/", views.search_serial_api),
@@ -43,6 +41,7 @@ urlpatterns = [
     path("abewinvoice/",views.tax_invoice_list_create,name="tax_invoice_list_create"),
     path("abewinvoice/<int:invoice_id>/",views.tax_invoice_update,name="tax_invoice_update"),
     path( "abewinvoice/<int:invoice_id>/email/",views.send_invoice_email,name="send_invoice_email"),
+    path("csrf_token_api/",views.csrf_token_api,name="csrf_token_api"),
 ]
  
 if settings.DEBUG:

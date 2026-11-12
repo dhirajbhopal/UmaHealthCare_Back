@@ -60,6 +60,18 @@ from rest_framework.exceptions import ValidationError
 from django.core.mail import EmailMessage
 
 
+from django.views.decorators.http import require_GET, require_POST
+from django.views.decorators.csrf import ensure_csrf_cookie
+from django.middleware.csrf import get_token
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
+from django.core.files.images import get_image_dimensions
+from django.views.decorators.http import require_http_methods
+
+User = get_user_model()
+
+
+
 # ==========================================
 # SIGNUP API
 # ==========================================
@@ -382,6 +394,8 @@ def sendotp_api(request):
             "success": False,
             "message": str(e)
         })
+
+
 # =========================================
 # LOGIN API
 # =========================================
@@ -457,95 +471,6 @@ def logout_api(request):
         "success": True,
         "message": "Logout successful"
     })
-
-
-# =========================================
-# PROFILE API
-# =========================================
-
-def profile_api(request):
-    # 1. CHECK AUTHENTICATION
-    if not request.user.is_authenticated:
-        return JsonResponse({
-            "success": False,
-            "message": "User Not Logged In"
-        }, status=401) # Explicit unauthorized status
-
-    try:
-        user = request.user
-
-        # Safe image handling
-        image_url = user.image.url if user.image else None
-        # Note: If these fields are on a Profile model, use user.profile.mobileno, etc.
-
-        return JsonResponse({
-            "success": True,
-            "user": {
-                "id": user.id,
-                "username": user.username,
-                "email": user.email,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "mobileno": getattr(user, 'mobileno', ''),
-                "gender": getattr(user, 'gender', ''),
-                "address": getattr(user, 'address', ''),
-                "image": str(user.image)
-            }
-        })
-    except Exception as e:
-        return JsonResponse({
-            "success": False,
-            "message": f"Server Error: {str(e)}"
-        }, status=500)
-
-
-# =========================================
-# UPDATE PROFILE API
-# =========================================
-@csrf_exempt
-def update_profile_api(request):
-    # 1. Ensure the user is actually logged in
-    if not request.user.is_authenticated:
-        return JsonResponse({
-            "success": False,
-            "message": "Authentication Required. Please log in."
-        }, status=401)
-
-    # 2. Only allow PUT requests
-    if request.method != "PUT":
-        return JsonResponse({
-            "success": False,
-            "message": "PUT Method Required"
-        }, status=405)
-
-    try:
-        # Load the incoming React JSON data
-        data = json.loads(request.body)
-
-        # DYNAMIC USER: Get the user directly from the request session
-        user = request.user
-
-        # Update core user fields safely
-        user.first_name = data.get("first_name", user.first_name)
-        user.last_name = data.get("last_name", user.last_name)
-        user.mobileno = data.get("mobileno", user.mobileno)
-        user.gender = data.get("gender", user.gender)
-        user.address = data.get("address", user.address)
-
-        # Save changes to the database
-        user.save()
-
-        return JsonResponse({
-            "success": True,
-            "message": "Profile Updated Successfully"
-        })
-
-    except Exception as e:
-        return JsonResponse({
-            "success": False,
-            "message": f"Server Error: {str(e)}"
-        }, status=500)
-
 
 
 # =========================================
@@ -1566,3 +1491,54 @@ GSTIN NO : 201PEPS5760GIZR
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR
         )
+
+
+
+
+# ==========================================
+# USER PROFILE SERIALIZER
+# ==========================================
+
+def serialize_user_profile(request, user):
+
+    image_url = None
+
+    if user.image:
+
+        try:
+            image_url = request.build_absolute_uri(
+                user.image.url
+            )
+        except (ValueError, AttributeError):
+            image_url = None
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "mobileno": user.mobileno or "",
+        "gender": user.gender or "",
+        "role": user.role or "",
+        "address": user.address or "",
+        "image": image_url,
+        "is_staff": user.is_staff,
+        "is_superuser": user.is_superuser,
+    }
+
+
+# ==========================================
+# CSRF TOKEN API
+# ==========================================
+
+@ensure_csrf_cookie
+@require_GET
+def csrf_token_api(request):
+
+    return JsonResponse({
+        "success": True,
+        "csrfToken": get_token(request)
+    })
+
+
