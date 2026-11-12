@@ -27,7 +27,6 @@ urlpatterns = [
     path('api/change-password/',views.ChangePasswordAPIView.as_view(),),
     path('signup/',Signup.as_view(),name='Signup'),
     path("sendotp_api/",views.sendotp_api,name="sendotp_api"),
-    path("csrf_token_api/", views.csrf_token_api, name="csrf_token_api"),
     path("profile_api/", views.profile_api, name="profile_api"),
     path("update_profile_api/", views.update_profile_api, name="update_profile_api"),
     path("donation_list_api/", views.donation_list_api),
@@ -54,6 +53,3 @@ if settings.DEBUG:
 
 urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
 urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-
-
-
