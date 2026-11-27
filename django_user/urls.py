@@ -15,33 +15,18 @@ from core.views import Signup, PasswordResetAPIView, PasswordResetConfirmAPIView
 from core import views
 
 urlpatterns = [
-    #path('__debug__/', include('debug_toolbar.urls')),
     path('', include('django.contrib.auth.urls')),
     path('api/login/', views.login_api),
     path('HomeApi/',HomeApi.as_view(),),
     path('', include('core.urls')),
-    path('donationdetail/',views.donationdetail,name='donationdetail'),
     path('imageupload/',views.imageupload,name='imageupload'),
     path('api/password-reset/', views.PasswordResetAPIView.as_view(), name='password_reset'),
     path('api/reset-password/', views.PasswordResetConfirmAPIView.as_view(), name='reset-password'),
     path('api/change-password/',views.ChangePasswordAPIView.as_view(),),
     path('signup/',Signup.as_view(),name='Signup'),
     path("sendotp_api/",views.sendotp_api,name="sendotp_api"),
-    path("donation_list_api/", views.donation_list_api),
-    path("generate_unique_code_api/", views.generate_unique_code_api),
-    path("search_serial_api/", views.search_serial_api),
-    path("update_serial_api/", views.update_serial_api),
-    path("serial_list_api/", views.serial_list_api),
     re_path(r'^media/(?P<path>.*)$', serve, {'document_root': settings.MEDIA_ROOT}),
     re_path(r'^static/(?P<path>.*)$', serve, {'document_root': settings.STATIC_ROOT}),
-    path( "abewinvoice/",views.tax_invoice_list_create,name="tax_invoice_list_create"),
-    path("abewinvoiceview/<int:invoice_id>/",views.tax_invoice_detail,name="tax_invoice_detail"),
-    path("parties/", views.party_list_create, name="party-list-create"),
-    path("parties/<int:party_id>/", views.party_detail, name="party-detail"),
-    path("abewinvoice/",views.tax_invoice_list_create,name="tax_invoice_list_create"),
-    path("abewinvoice/<int:invoice_id>/",views.tax_invoice_update,name="tax_invoice_update"),
-    path( "abewinvoice/<int:invoice_id>/email/",views.send_invoice_email,name="send_invoice_email"),
-    path("csrf_token_api/",views.csrf_token_api,name="csrf_token_api"),
 ]
  
 if settings.DEBUG:

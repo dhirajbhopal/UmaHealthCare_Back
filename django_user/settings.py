@@ -32,9 +32,7 @@ CORS_ALLOW_CREDENTIALS = True
 
 # Allow your React origin (including www variant for production)
 CORS_ALLOWED_ORIGINS = [
-    "https://pjkss.com",
     "https://pjkss.pythonanywhere.com",
-    "https://www.pjkss.com",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8000",
     "http://localhost:3000"
@@ -42,9 +40,7 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://pjkss.com",
     "https://pjkss.pythonanywhere.com",
-    "https://www.pjkss.com",
     "http://127.0.0.1:3000",
     "http://127.0.0.1:8000",
     "http://localhost:3000"
@@ -112,30 +108,14 @@ TEMPLATES = [
 WSGI_APPLICATION = 'django_user.wsgi.application'
 
 
-# Database (MySQL) - FIXED HOST FOR CPANEL
-"""DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'pjkssco1_pjkss_db',
-        'USER': 'pjkssco1_pjkssdhiraj',
-        'PASSWORD': 'patel@PJKSS#dehri$bihar%2026',
-        'HOST': 'localhost',  # Connected locally inside cPanel
-        'PORT': '3306',
-        'OPTIONS': {
-            'charset': 'utf8mb4',
-        },
-    }
-}"""
-
-
 # MySQL Database Configuration for pythonanywhere
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'pjkss$pjkss_db',
-        'USER': 'pjkss',
+        'NAME': 'dhirajpatel$umahealthcare',
+        'USER': 'dhirajpatel',
         'PASSWORD': 'patel@PJKSS#dehri$bihar%2026',
-        'HOST': 'pjkss.mysql.pythonanywhere-services.com',
+        'HOST': 'dhirajpatel.mysql.pythonanywhere-services.com',
         'PORT': '3306',
     }
 }
@@ -183,7 +163,7 @@ AUTH_USER_MODEL = "core.User"
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = 'smtp.gmail.com'
 EMAIL_PORT = 587
-EMAIL_HOST_USER = 'pjkssinfo@gmail.com'
-EMAIL_HOST_PASSWORD = 'bwqpbkcdutyqheoi'
+EMAIL_HOST_USER = 'umahealthcarepvtltd@gmail.com'
+EMAIL_HOST_PASSWORD = 'vjcdpwcxymhxzhvz'
 EMAIL_USE_TLS = True
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
