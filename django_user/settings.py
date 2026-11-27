@@ -112,30 +112,15 @@ TEMPLATES = [
 WSGI_APPLICATION = 'django_user.wsgi.application'
 
 
-# Database (MySQL) - FIXED HOST FOR CPANEL
-"""DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'pjkssco1_pjkss_db',
-        'USER': 'pjkssco1_pjkssdhiraj',
-        'PASSWORD': 'patel@PJKSS#dehri$bihar%2026',
-        'HOST': 'localhost',  # Connected locally inside cPanel
-        'PORT': '3306',
-        'OPTIONS': {
-            'charset': 'utf8mb4',
-        },
-    }
-}"""
-
 
 # MySQL Database Configuration for pythonanywhere
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.mysql',
-        'NAME': 'pjkss$pjkss_db',
-        'USER': 'pjkss',
+        'NAME': 'dhirajpatel$umahealthcare',
+        'USER': 'dhirajpatel',
         'PASSWORD': 'patel@PJKSS#dehri$bihar%2026',
-        'HOST': 'pjkss.mysql.pythonanywhere-services.com',
+        'HOST': 'dhirajpatel.mysql.pythonanywhere-services.com',
         'PORT': '3306',
     }
 }

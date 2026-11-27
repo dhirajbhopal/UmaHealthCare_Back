@@ -1,16 +1,9 @@
 from django.contrib import admin
 #from student.models import student
 #from faculty.models import faculty
-from core.models import User,UniqueCode, donation,UserLoginInfo,updates,PartyDetail,TaxInvoice, TaxInvoiceItem
+from core.models import User,UserLoginInfo
 from django.contrib.auth.admin import UserAdmin as DefaultUserAdmin
 from django.utils.html import format_html
-
-# Register your models here.
-
-"""@admin.register(faculty)
-class facultyAdmin(admin.ModelAdmin):
-	list_display=['id','name'  ,  'email',  'mobileno'  ,  'subject'  ,  'image']"""
-
 
 
 @admin.register(User)
@@ -60,43 +53,7 @@ class UserAdmin(admin.ModelAdmin):
 
 
 
-@admin.register(UniqueCode)
+"""@admin.register(UniqueCode)
 class UniqueCodeAdmin(admin.ModelAdmin):
-    list_display=['code','issuername','issuedto','subject','issuedate']
+    list_display=['code','issuername','issuedto','subject','issuedate']"""
 
-
-@admin.register(donation)
-class donationAdmin(admin.ModelAdmin):
-    list_display=['name','lastname','address','Amount']
-
-
-@admin.register(UserLoginInfo)
-class UserLoginInfoAdmin(admin.ModelAdmin):
-    list_display=['ip_address','login_time','city','region','country','browser','os','device', 'user']
-
-
-@admin.register(updates)
-class updatesAdmin(admin.ModelAdmin):
-    list_display=['topic','date']
-
-
-
-#vijay/////////////
-
-@admin.register(PartyDetail)
-class PartyDetailAdmin(admin.ModelAdmin):
-    list_display=['name','email','mobilno','address','shipping_add','gstin_uin']
-
-
-@admin.register(TaxInvoice )
-class TaxInvoiceAdmin(admin.ModelAdmin):
-    list_display=['serial_no','invoice_date', 'name','email','mobile_no','address','shipping_add','gstin_uin']
-
-
-
-
-@admin.register(TaxInvoiceItem )
-class TaxInvoiceItemAdmin(admin.ModelAdmin):
-    list_display=['invoice_id','item_no', 'item_name','hsn_code','quantity','unit','rate','cgst_rate','sgst_rate',
-    'discount', 'total_amount']
-    

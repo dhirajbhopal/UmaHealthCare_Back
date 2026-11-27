@@ -5,17 +5,7 @@ pip install PyMySQL
 pip install mysqlclient
 
 root pass:- patel@PJKSS#dehri$bihar%2026
-user :-pjkssdhiraj  
+user :-umahealthcare /dhirajpatel
 pass:- patel@PJKSS#dehri$bihar%2026
-windows server name:-MySQL80
+windows server name:- dhirajpatel.mysql.pythonanywhere-services.com
 
-change command js to sql :- \sql
-
-run command :-  \connect root@localhost
-
-check version1 :- mysql --version  
-check version1 :- "C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe" --version
-
-path:- C:\Program Files\MySQL\MySQL Server 8.0\bin  (important)
-
-backup MySQL database :- mysqldump -u pjkssdhiraj -p pjkss_db > "C:\Users\Dhiraj-PC\Desktop\pjkss_backup.sql"
