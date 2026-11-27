@@ -11,11 +11,22 @@ from django.core.mail import send_mail, BadHeaderError
 from django.contrib.staticfiles.urls import staticfiles_urlpatterns # new
 from django.views.static import serve #new
 from django.urls import path, include, re_path #new
-from core.views import Signup, PasswordResetAPIView, PasswordResetConfirmAPIView, ChangePasswordAPIView, HomeApi
+from core.views import Signup, PasswordResetAPIView, PasswordResetConfirmAPIView, ChangePasswordAPIView, HomeApi, PatientViewSet
 from core import views
+from rest_framework.routers import DefaultRouter
+
+router = DefaultRouter()
+
+router.register(
+    r"patients",
+    PatientViewSet,
+    basename="patients"
+)
+
 
 urlpatterns = [
     path('', include('django.contrib.auth.urls')),
+    path("api/", include(router.urls)),
     path('api/login/', views.login_api),
     path('HomeApi/',HomeApi.as_view(),),
     path('', include('core.urls')),

@@ -5,7 +5,7 @@
 ## git commit -m "first"
 ## git push -f -u origin main for pushing on git or
 ## git push -u origin main
-## git clone https://github.com/dhirajbhopal/PJKSS.git
+## git clone https://github.com/dhirajbhopal/UmaHealthCare_Back.git
 ## git remote set-url origin https://github.com/dhirajbhopal/Django_Backend.git
 ## git remote set-url origin https://github.com/dhirajbhopal/pjkss.git
 ## git push -u -f origin main/master

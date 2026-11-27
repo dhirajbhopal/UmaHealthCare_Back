@@ -5,7 +5,7 @@ pip install PyMySQL
 pip install mysqlclient
 
 root pass:- patel@PJKSS#dehri$bihar%2026
-user :-pjkssdhiraj  
+user :-pjkssdhiraj
 pass:- patel@PJKSS#dehri$bihar%2026
 windows server name:-MySQL80
 

@@ -21,7 +21,7 @@ SESSION_SAVE_EVERY_REQUEST = True
 
 # Add your API subdomain here if you are using one (e.g., 'api.pjkss.com')
 #ALLOWED_HOSTS = ['pjkss.com', 'www.pjkss.com', '127.0.0.1' , 'http://127.0.0.1:3000', 'pjkss.pythonanywhere.com']
-ALLOWED_HOSTS = ['pjkss.pythonanywhere.com']
+ALLOWED_HOSTS = ['*']
 
 # CSRF and session cookies
 SESSION_COOKIE_SAMESITE = 'None'

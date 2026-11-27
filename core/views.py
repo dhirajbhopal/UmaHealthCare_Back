@@ -69,6 +69,140 @@ User = get_user_model()
 
 
 
+from rest_framework import viewsets, filters, status
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.pagination import PageNumberPagination
+from django_filters.rest_framework import DjangoFilterBackend
+
+from .models import Patient
+from .serializers import PatientSerializer
+
+
+# -----------------------------------------
+# PATIENT PAGINATION
+# -----------------------------------------
+
+class PatientPagination(PageNumberPagination):
+    page_size = 20
+    page_size_query_param = "page_size"
+    max_page_size = 100
+
+
+# -----------------------------------------
+# PATIENT MANAGEMENT VIEWSET
+# -----------------------------------------
+
+class PatientViewSet(viewsets.ModelViewSet):
+
+    serializer_class = PatientSerializer
+    permission_classes = [IsAuthenticated]
+    pagination_class = PatientPagination
+
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+
+    filterset_fields = [
+        "gender",
+        "patient_status",
+        "blood_group",
+        "city",
+        "state",
+    ]
+
+    search_fields = [
+        "patient_code",
+        "full_name",
+        "father_husband_name",
+        "mobile",
+        "alternate_mobile",
+        "email",
+    ]
+
+    ordering_fields = [
+        "registration_date",
+        "full_name",
+        "patient_code",
+        "created_at",
+    ]
+
+    ordering = ["-registration_date"]
+
+    def get_queryset(self):
+        queryset = Patient.objects.all()
+
+        # Optional status filter
+        patient_status = self.request.query_params.get("status")
+
+        if patient_status:
+            queryset = queryset.filter(
+                patient_status__iexact=patient_status
+            )
+
+        # Optional gender filter
+        gender = self.request.query_params.get("gender")
+
+        if gender:
+            queryset = queryset.filter(
+                gender__iexact=gender
+            )
+
+        return queryset
+
+    # -------------------------------------
+    # ACTIVATE PATIENT
+    # -------------------------------------
+
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path="activate"
+    )
+    def activate(self, request, pk=None):
+
+        patient = self.get_object()
+
+        patient.patient_status = "Active"
+        patient.save(update_fields=["patient_status"])
+
+        serializer = self.get_serializer(patient)
+
+        return Response({
+            "message": "Patient activated successfully.",
+            "patient": serializer.data
+        }, status=status.HTTP_200_OK)
+
+    # -------------------------------------
+    # DEACTIVATE PATIENT
+    # -------------------------------------
+
+    @action(
+        detail=True,
+        methods=["patch"],
+        url_path="deactivate"
+    )
+    def deactivate(self, request, pk=None):
+
+        patient = self.get_object()
+
+        patient.patient_status = "Inactive"
+        patient.save(update_fields=["patient_status"])
+
+        serializer = self.get_serializer(patient)
+
+        return Response({
+            "message": "Patient deactivated successfully.",
+            "patient": serializer.data
+        }, status=status.HTTP_200_OK)
+
+
+
+
+
 # ==========================================
 # SIGNUP API
 # ==========================================
