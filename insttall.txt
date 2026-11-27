@@ -15,9 +15,6 @@ npm install react react-dom
 npm install html2pdf.js
 npm install @craco/craco
 npm install react-easy-crop
-npm install xlsx
-npm install jsbarcode
-
 
 
 
@@ -40,13 +37,3 @@ pip isntall pillow
 pip isntall qrcode
 pip install PyMySQL
 py -m pip install user-agents
-
-
-Laptop Audio Driver Detail
-Detail	Information
-Audio chip	ES8336
-Driver name	ESAuDriver
-Hardware ID	ACPI\ESSX8336
-Manufacturer	Everest Semiconductor
-Driver category	Sound
-driver link https://www.catalog.update.microsoft.com/Search.aspx?q=ACPI%5CESSX8336&utm_source=chatgpt.com

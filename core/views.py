@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.csrf import csrf_exempt
 from django.core.files.base import ContentFile
 from django.utils.decorators import method_decorator
-from core.models import User,UserLoginInfo
+from core.models import User, UniqueCode, donation, UserLoginInfo, updates
 from django.contrib.auth.models import User
 from rest_framework import serializers
 from django.db.models import Sum
@@ -47,6 +47,9 @@ User = get_user_model()
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from .models import TaxInvoice , TaxInvoiceItem  , PartyDetail
+from .serializers import (TaxInvoiceCreateSerializer,TaxInvoiceSerializer)
+from .serializers import PartyDetailSerializer
 
 from decimal import Decimal, ROUND_HALF_UP
 from django.db import transaction
@@ -569,6 +572,202 @@ def profile_api(request):
         }
     })
 
+@csrf_exempt
+def generate_unique_code_api(request):
+
+    if request.method != "POST":
+        return JsonResponse({
+            "success": False,
+            "message": "POST request required"
+        }, status=405)
+
+    try:
+        data = json.loads(request.body)
+
+        issuername = data.get("issuername", "").strip()
+        issuedto = data.get("issuedto") or None
+        subject = data.get("subject") or None
+        issuedate = data.get("issuedate") or None
+
+        if not issuername:
+            return JsonResponse({
+                "success": False,
+                "message": "Issuer name is required"
+            }, status=400)
+
+        if len(issuername) > 80:
+            return JsonResponse({
+                "success": False,
+                "message": "Issuer name cannot exceed 50 characters"
+            }, status=400)
+
+        if issuedto and len(issuedto) > 80:
+            return JsonResponse({
+                "success": False,
+                "message": "Issued-to name cannot exceed 80 characters"
+            }, status=400)
+
+        if subject and len(subject) > 300:
+            return JsonResponse({
+                "success": False,
+                "message": "Subject cannot exceed 100 characters"
+            }, status=400)
+
+        if issuedate:
+            try:
+                datetime.strptime(issuedate, "%Y-%m-%d")
+            except ValueError:
+                return JsonResponse({
+                    "success": False,
+                    "message": "Invalid issue date"
+                }, status=400)
+
+        prefix = "PJKSS"
+        current_year = datetime.now().year
+
+        def create_code():
+            return "".join(
+                random.choices(
+                    string.ascii_uppercase + string.digits,
+                    k=10
+                )
+            )
+
+        # Generate and save a unique code.
+        # A transaction protects the database operation.
+        with transaction.atomic():
+
+            while True:
+                code = f"{prefix}{current_year}{create_code()}"
+
+                if not UniqueCode.objects.filter(code=code).exists():
+                    break
+
+            record = UniqueCode.objects.create(
+                code=code,
+                issuername=issuername,
+                issuedto=issuedto,
+                subject=subject,
+                issuedate=issuedate or None
+            )
+
+        return JsonResponse({
+            "success": True,
+            "message": "Succesfully serial number Generated"
+        })
+
+    except json.JSONDecodeError:
+        return JsonResponse({
+            "success": False,
+            "message": "Invalid JSON data"
+        }, status=400)
+
+    except Exception:
+        return JsonResponse({
+            "success": False,
+            "message": "Unable to generate serial number"
+        }, status=500)
+
+
+
+
+# =========================================
+# SEARCH SERIAL API
+# =========================================
+
+@csrf_exempt
+def search_serial_api(request):
+
+    code = request.GET.get("serialno")
+
+    serial = UniqueCode.objects.filter(code=code).values()
+
+    if serial.exists():
+
+        return JsonResponse({
+            "success": True,
+            "data": list(serial)
+        })
+
+    return JsonResponse({
+        "success": False,
+        "message": "Serial not found"
+    }, status=404)
+
+
+# =========================================
+# SERIAL LIST API
+# =========================================
+
+@csrf_exempt
+def serial_list_api(request):
+
+    serials = UniqueCode.objects.all().values()
+
+    return JsonResponse({
+        "success": True,
+        "data": list(serials)
+    })
+
+
+# =========================================
+# UPDATE SERIAL API
+# =========================================
+
+@csrf_exempt
+def update_serial_api(request):
+
+    if request.method != "PUT":
+        return JsonResponse({
+            "success": False,
+            "message": "PUT method required"
+        }, status=405)
+
+    try:
+
+        data = json.loads(request.body)
+
+        code = data.get("serialno")
+
+        serial = UniqueCode.objects.get(code=code)
+
+        serial.issuedto = data.get("issuedto")
+        serial.subject = data.get("subject")
+        serial.issuedate = data.get("issuedate")
+        serial.issuername = data.get("issuername")
+
+        serial.save()
+
+        return JsonResponse({
+            "success": True,
+            "message": "Serial updated successfully"
+        })
+
+    except Exception as e:
+        return JsonResponse({
+            "success": False,
+            "error": str(e)
+        }, status=400)
+
+
+# =========================================
+# DONATION LIST API
+# =========================================
+
+def donation_list_api(request):
+
+    donations = donation.objects.all().values()
+
+    # TOTAL AMOUNT
+    total_amount = donation.objects.aggregate(
+        total=Sum('Amount')
+    )['total'] or 0
+
+    return JsonResponse({
+        "success": True,
+        "data": list(donations),
+        "total_amount": total_amount
+    })
 
 
 # =========================================
@@ -609,6 +808,80 @@ class HomeApi(View):
         })
 
 
+# Donation Qr Code API
+
+@api_view(["POST"])
+def donationdetail(request):
+
+    try:
+
+        # GET AMOUNT FROM REACT
+        amount = request.data.get("amount")
+
+        # VALIDATION
+        if not amount:
+            return Response(
+                {
+                    "success": False,
+                    "message": "Amount is required"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # CREATE UPI LINK
+        qr_text = (
+            "upi://pay?"
+            "pa=dhirajpatel08@okaxis"
+            "&pn=DHIRAJ%20PATEL"
+            f"&am={amount}"
+            "&cu=INR"
+            "&aid=uGICAgID1xJq5DA"
+        )
+
+        # GENERATE QR CODE
+        qr_image = qrcode.make(qr_text, box_size=15)
+
+        stream = BytesIO()
+
+        qr_image.save(stream, format="PNG")
+
+        qr_image_data = stream.getvalue()
+
+        # CONVERT TO BASE64
+        qr_image_base64 = base64.b64encode(
+            qr_image_data
+        ).decode("utf-8")
+
+        # PHONEPE LINK
+        upilinkPTM = (
+            "https://mercury-uat.phonepe.com/transact/uat_v2?"
+            "token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+        )
+
+        # SEND RESPONSE TO REACT
+        return Response(
+            {
+                "success": True,
+                "amount": amount,
+                "qr_image_base64": qr_image_base64,
+                "upi_link": qr_text,
+                "upilinkPTM": upilinkPTM
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+
+        return Response(
+            {
+                "success": False,
+                "message": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+#Password rest email api views###
 
 
 class PasswordResetAPIView(APIView):
@@ -712,5 +985,560 @@ class ChangePasswordAPIView(APIView):
                 "success": False,
                 "message": "User not found"
             })
+
+
+
+
+#Vijya///////////////////////////////////////////////////////
+
+
+# =========================================
+# Create New Party Lst
+# =========================================
+
+@api_view(["GET", "POST"])
+def party_list_create(request):
+
+    # सभी पार्टियों की लिस्ट
+    if request.method == "GET":
+        parties = PartyDetail.objects.all().order_by("-id")
+        serializer = PartyDetailSerializer(parties, many=True)
+        return Response(serializer.data)
+
+    # नई पार्टी सेव करना
+    elif request.method == "POST":
+        serializer = PartyDetailSerializer(data=request.data)
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response(
+                {
+                    "message": "Party saved successfully",
+                    "data": serializer.data
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+
+# =========================================
+# Party Deail
+# =========================================
+
+@api_view(["GET", "PUT", "PATCH", "DELETE"])
+def party_detail(request, party_id):
+
+    try:
+        party = PartyDetail.objects.get(id=party_id)
+    except PartyDetail.DoesNotExist:
+        return Response(
+            {"message": "Party not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    # एक पार्टी की जानकारी
+    if request.method == "GET":
+        serializer = PartyDetailSerializer(party)
+        return Response(serializer.data)
+
+    # पार्टी अपडेट करना
+    elif request.method in ["PUT", "PATCH"]:
+        serializer = PartyDetailSerializer(
+            party,
+            data=request.data,
+            partial=(request.method == "PATCH")
+        )
+
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                "message": "Party updated successfully",
+                "data": serializer.data
+            })
+
+        return Response(
+            serializer.errors,
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    # पार्टी डिलीट करना
+    elif request.method == "DELETE":
+        party.delete()
+        return Response(
+            {"message": "Party deleted successfully"},
+            status=status.HTTP_200_OK
+        )
+
+# =========================================
+# CREATE AND DISPLAY TAX INVOICES
+# =========================================
+
+@api_view(["GET", "POST"])
+def tax_invoice_list_create(request):
+
+    # GET: Display all invoices
+    if request.method == "GET":
+
+        invoices = TaxInvoice.objects.prefetch_related(
+            "items"
+        ).all()
+
+        serializer = TaxInvoiceSerializer(
+            invoices,
+            many=True
+        )
+
+        return Response(serializer.data)
+
+    # POST: Create new invoice
+    if request.method == "POST":
+
+        serializer = TaxInvoiceCreateSerializer(
+            data=request.data
+        )
+
+        if serializer.is_valid():
+
+            invoice = serializer.save()
+
+            response_serializer = TaxInvoiceSerializer(invoice)
+
+            return Response(
+                {
+                    "success": True,
+                    "message": "Invoice created successfully",
+                    "invoice": response_serializer.data
+                },
+                status=status.HTTP_201_CREATED
+            )
+
+        return Response(
+            {
+                "success": False,
+                "errors": serializer.errors
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+# =========================================
+# GET SINGLE INVOICE
+# =========================================
+
+@api_view(["GET"])
+def tax_invoice_detail(request, invoice_id):
+
+    try:
+        invoice = TaxInvoice.objects.prefetch_related(
+            "items"
+        ).get(id=invoice_id)
+
+    except TaxInvoice.DoesNotExist:
+
+        return Response(
+            {"error": "Invoice not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    serializer = TaxInvoiceSerializer(invoice)
+
+    return Response(serializer.data)
+
+
+
+
+
+from decimal import Decimal, ROUND_HALF_UP
+
+from django.db import transaction
+from django.shortcuts import get_object_or_404
+
+from rest_framework.decorators import api_view
+from rest_framework.response import Response
+from rest_framework import status
+from rest_framework.exceptions import ValidationError
+
+from .models import TaxInvoice, TaxInvoiceItem
+
+
+# =========================================
+# UPDATE INVOICE ITEMS ONLY
+# CUSTOMER DETAILS WILL NOT BE MODIFIED
+# DISCOUNT AFTER GST
+# =========================================
+
+@api_view(["PUT", "PATCH"])
+def tax_invoice_update(request, invoice_id):
+
+    try:
+
+        with transaction.atomic():
+
+            # =================================
+            # GET EXISTING INVOICE
+            # =================================
+
+            invoice = get_object_or_404(
+                TaxInvoice.objects.select_for_update(),
+                id=invoice_id
+            )
+
+            # =================================
+            # GET ITEMS FROM REACT
+            # =================================
+
+            items_data = request.data.get("items")
+
+            if not isinstance(items_data, list) or not items_data:
+
+                raise ValidationError(
+                    "At least one invoice item is required."
+                )
+
+            retained_item_numbers = []
+
+            # =================================
+            # PROCESS EACH ITEM
+            # =================================
+
+            for index, item in enumerate(items_data):
+
+                item_no = index + 1
+
+                item_name = str(
+                    item.get("item_name") or ""
+                ).strip()
+
+                if not item_name:
+
+                    raise ValidationError(
+                        f"Item name required in row {item_no}."
+                    )
+
+                try:
+
+                    quantity = Decimal(
+                        str(item.get("quantity", 0))
+                    )
+
+                    rate = Decimal(
+                        str(item.get("rate", 0))
+                    )
+
+                    discount = Decimal(
+                        str(item.get("discount", 0))
+                    )
+
+                    cgst_rate = Decimal(
+                        str(item.get("cgst_rate", 0))
+                    )
+
+                    sgst_rate = Decimal(
+                        str(item.get("sgst_rate", 0))
+                    )
+
+                except Exception:
+
+                    raise ValidationError(
+                        f"Invalid numeric value in row {item_no}."
+                    )
+
+                # =================================
+                # VALIDATION
+                # =================================
+
+                if quantity <= 0:
+
+                    raise ValidationError(
+                        f"Invalid quantity in row {item_no}."
+                    )
+
+                if rate < 0 or discount < 0:
+
+                    raise ValidationError(
+                        f"Invalid rate or discount in row {item_no}."
+                    )
+
+                if cgst_rate < 0 or sgst_rate < 0:
+
+                    raise ValidationError(
+                        f"Invalid GST rate in row {item_no}."
+                    )
+
+                # =================================
+                # SUBTOTAL
+                # =================================
+
+                subtotal = quantity * rate
+
+                # =================================
+                # GST ON FULL SUBTOTAL
+                # =================================
+
+                cgst = (
+                    subtotal * cgst_rate / Decimal("100")
+                )
+
+                sgst = (
+                    subtotal * sgst_rate / Decimal("100")
+                )
+
+                total_before_discount = (
+                    subtotal + cgst + sgst
+                )
+
+                # =================================
+                # DISCOUNT AFTER GST
+                # =================================
+
+                if discount > total_before_discount:
+
+                    raise ValidationError(
+                        f"Discount exceeds total amount in row {item_no}."
+                    )
+
+                total_amount = (
+                    total_before_discount - discount
+                ).quantize(
+                    Decimal("0.01"),
+                    rounding=ROUND_HALF_UP
+                )
+
+                # =================================
+                # CREATE OR UPDATE ITEM
+                # =================================
+
+                TaxInvoiceItem.objects.update_or_create(
+
+                    invoice=invoice,
+
+                    item_no=item_no,
+
+                    defaults={
+
+                        "item_name": item_name,
+
+                        "hsn_code": item.get("hsn_code") or None,
+
+                        "quantity": quantity,
+
+                        "unit": item.get("unit") or "PCS",
+
+                        "rate": rate,
+
+                        "cgst_rate": cgst_rate,
+
+                        "sgst_rate": sgst_rate,
+
+                        "discount": discount,
+
+                        # FINAL AMOUNT AFTER GST AND DISCOUNT
+                        "total_amount": total_amount,
+                    }
+                )
+
+                retained_item_numbers.append(item_no)
+
+            # =================================
+            # DELETE REMOVED ITEMS
+            # =================================
+
+            TaxInvoiceItem.objects.filter(
+                invoice=invoice
+            ).exclude(
+                item_no__in=retained_item_numbers
+            ).delete()
+
+            # =================================
+            # RETURN UPDATED INVOICE ITEMS
+            # =================================
+
+            updated_items = TaxInvoiceItem.objects.filter(
+                invoice=invoice
+            ).order_by("item_no")
+
+            return Response(
+                {
+                    "message": "Invoice items updated successfully",
+
+                    "invoice_id": invoice.id,
+
+                    "serial_no": invoice.serial_no,
+
+                    "items": list(
+                        updated_items.values()
+                    )
+                },
+                status=status.HTTP_200_OK
+            )
+
+    except ValidationError as e:
+
+        return Response(
+            {"error": e.detail},
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+    except Exception as e:
+
+        return Response(
+            {
+                "error": "Invoice item update failed",
+                "details": str(e)
+            },
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+
+#///////////////Tax invoice EMail Sending/////////////////////
+
+@api_view(["POST"])
+def send_invoice_email(request, invoice_id):
+
+    try:
+
+        invoice = get_object_or_404(
+            TaxInvoice,
+            id=invoice_id
+        )
+
+        # Get customer email from database
+        customer_email = invoice.email
+
+        if not customer_email:
+            return Response(
+                {"error": "Customer email address not found."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Get generated PDF
+        pdf_file = request.FILES.get("pdf_file")
+
+        if not pdf_file:
+            return Response(
+                {"error": "Invoice PDF is missing."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if pdf_file.size > 10 * 1024 * 1024:
+            return Response(
+                {"error": "PDF file must be smaller than 10 MB."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        if pdf_file.content_type != "application/pdf":
+            return Response(
+                {"error": "Only PDF files are allowed."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        # Create email
+        email = EmailMessage(
+            subject=f"Tax Invoice - {invoice.serial_no}",
+
+            body=f"""
+Dear {invoice.name or invoice.customer_name},
+
+Please find attached your tax invoice.
+
+Invoice Number: {invoice.serial_no}
+
+Thank you for choosing AB Electrical Works.
+
+Regards,
+AB ELECTRICAL WORKS
+Plot No 7 Narkra Bokaro Steel City
+Bokaro Steel City 827014
+Mob No : 9431378910. 7870865028. 6200919537
+GSTIN NO : 201PEPS5760GIZR
+""",
+
+            from_email=settings.DEFAULT_FROM_EMAIL,
+
+            to=[customer_email]
+        )
+
+        # Attach PDF
+        email.attach(
+            f"{invoice.serial_no}.pdf",
+            pdf_file.read(),
+            "application/pdf"
+        )
+
+        # Send email
+        email.send(fail_silently=False)
+
+        return Response(
+            {
+                "success": True,
+                "message": "Invoice email sent successfully.",
+                "email": customer_email
+            },
+            status=status.HTTP_200_OK
+        )
+
+    except Exception as e:
+
+        return Response(
+            {
+                "error": str(e)
+            },
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+
+
+# ==========================================
+# USER PROFILE SERIALIZER
+# ==========================================
+
+def serialize_user_profile(request, user):
+
+    image_url = None
+
+    if user.image:
+
+        try:
+            image_url = request.build_absolute_uri(
+                user.image.url
+            )
+        except (ValueError, AttributeError):
+            image_url = None
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "mobileno": user.mobileno or "",
+        "gender": user.gender or "",
+        "role": user.role or "",
+        "address": user.address or "",
+        "image": image_url,
+        "is_staff": user.is_staff,
+        "is_superuser": user.is_superuser,
+    }
+
+
+# ==========================================
+# CSRF TOKEN API
+# ==========================================
+
+@ensure_csrf_cookie
+@require_GET
+def csrf_token_api(request):
+
+    return JsonResponse({
+        "success": True,
+        "csrfToken": get_token(request)
+    })
 
 

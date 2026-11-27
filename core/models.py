@@ -6,6 +6,7 @@ from django.contrib.auth.models import AbstractUser, AbstractBaseUser
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
+
 from django.db import models, transaction 
 from django.db.models import Max
 
@@ -62,11 +63,52 @@ class User(AbstractUser):
         upload_to='uploads/',
         blank=True,
         null=True,
+        default='staticfiles/images/PATEL_LOGO.png'
     )
 
 
     def __str__(self):
         return self.username
+
+
+
+class UniqueCode(models.Model): #serianno code for letterpad
+    code=models.CharField(max_length=25,unique=True)
+    issuername=models.CharField(max_length=80)
+    issuedto=models.CharField(max_length=80,blank=True,null=True)
+    subject=models.CharField(max_length=100,blank=True,null=True)
+    issuedate=models.DateField(blank=True, null=True)
+
+    def __str__(self):
+        return self.code
+
+
+# date and time
+
+class Post(models.Model):
+    title = models.CharField(max_length=200)
+    content = models.TextField()
+    
+    # created automatically
+    created_at = models.DateTimeField(auto_now_add=True)
+    # updated whenever saved
+    updated_at = models.DateTimeField(auto_now=True)
+
+    # if you want manual datetime
+    event_datetime = models.DateTimeField(null=True, blank=True)
+
+    def __str__(self):
+        return self.title
+
+class donation(models.Model):
+    name=models.CharField(max_length=80)
+    lastname=models.CharField(max_length=80)
+    address=models.CharField(max_length=80)
+    Amount=models.IntegerField()
+
+    def __str__(self):
+        return self.name
+
 
 
 class UserLoginInfo(models.Model):
@@ -82,3 +124,137 @@ class UserLoginInfo(models.Model):
 
     def __str__(self):
         return f"{self.user.username} - {self.ip_address}"
+
+
+class updates(models.Model):
+    topic=models.CharField(max_length=5000)
+    date=models.DateField(blank=True, null=True)
+
+    def __str__(self):
+        return self.topic
+
+
+#/////Vijay Data Base/////////////////
+
+
+
+
+# =========================================
+# PARTY DETAILS
+# =========================================
+
+class PartyDetail(models.Model):
+
+    name = models.CharField(max_length=300,null=True,blank=True)
+    email = models.EmailField(max_length=150, blank=True, null=True)
+    mobilno = models.CharField(max_length=12, blank=True, null=True)
+    address = models.CharField(max_length=300, blank=True, null=True)
+    shipping_add = models.CharField(max_length=300, blank=True, null=True)
+    gstin_uin = models.CharField(max_length=20, blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "party_detail"
+
+    def __str__(self):
+        return self.name
+
+
+# =========================================
+# TAX INVOICE MASTER
+# =========================================
+
+class TaxInvoice(models.Model):
+
+    serial_no = models.CharField(
+        max_length=20,
+        unique=True,
+        null=True,
+        blank=True
+    )
+
+    invoice_date = models.DateTimeField(default=timezone.now)
+    name = models.CharField(max_length=300,null=True,blank=True)
+    email = models.EmailField(max_length=150, blank=True, null=True)
+    mobile_no = models.CharField(max_length=12, blank=True, null=True)
+    address = models.CharField(max_length=300, blank=True, null=True)
+    shipping_add = models.CharField(max_length=300, blank=True, null=True)
+    gstin_uin = models.CharField(max_length=20, blank=True, null=True)
+
+    class Meta:
+        db_table = "tax_invoice"
+        ordering = ["-id"]
+
+    def save(self, *args, **kwargs):
+
+        is_new = self.pk is None
+
+        super().save(*args, **kwargs)
+
+        if is_new:
+            self.serial_no = f"ABEW{self.pk:07d}"
+
+            TaxInvoice.objects.filter(pk=self.pk).update(
+                serial_no=self.serial_no
+            )
+
+    def __str__(self):
+        return self.serial_no or str(self.pk)
+
+
+# =========================================
+# TAX INVOICE LINE ITEMS
+# =========================================
+
+class TaxInvoiceItem(models.Model):
+
+    invoice = models.ForeignKey(
+        TaxInvoice,
+        on_delete=models.CASCADE,
+        related_name="items"
+    )
+
+    item_no = models.PositiveIntegerField()
+
+    item_name = models.CharField(max_length=200, blank=True, null=True)
+    hsn_code = models.CharField(max_length=20, blank=True, null=True)
+
+    quantity = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0
+    )
+
+    unit = models.CharField(max_length=20, blank=True, null=True)
+
+    rate = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0
+    )
+
+    cgst_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0
+    )
+
+    sgst_rate = models.DecimalField(
+        max_digits=5, decimal_places=2, default=0
+    )
+
+    discount = models.DecimalField(
+        max_digits=10, decimal_places=2, default=0
+    )
+
+    total_amount = models.DecimalField(
+        max_digits=12, decimal_places=2, default=0
+    )
+
+    class Meta:
+        db_table = "tax_invoice_items"
+        ordering = ["item_no"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["invoice", "item_no"],
+                name="unique_invoice_item"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.invoice.serial_no} - {self.item_no}"

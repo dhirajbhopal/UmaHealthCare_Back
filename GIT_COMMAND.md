@@ -16,7 +16,7 @@
 ## remove existing repo
 ## git remote -v
 ## git remote set-url origin https://github.com/dhirajbhopal/Django_Backend.git
-## git remote set-url origin https://github.com/dhirajbhopal/UmaHealthCare_Back.git
+## git remote set-url origin https://github.com/dhirajbhopal/pjkss.git
 
 ## git pull origin main --allow-unrelated-histories  (if committ done from github online browser)
 
